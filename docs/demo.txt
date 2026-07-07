@@ -1,0 +1,17 @@
+Demo
+
+What was tested
+
+- Created a local Langfuse deployment via Helm.
+- Created an organization and project in Langfuse.
+- Generated and verified API keys.
+- Connected the local webhook to simulate an external automation trigger.
+- Verified that the webhook executed the update script.
+- Executed SQL against the PostgreSQL pod and confirmed the expected state change.
+
+Expected flow
+
+1. An external system sends a POST request to the webhook.
+2. The Flask app receives the payload.
+3. The script runs SQL inside the PostgreSQL pod.
+4. Langfuse reflects the change through its database-backed UI.

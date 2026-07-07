@@ -1,0 +1,16 @@
+Architecture
+
+Monday.com status update
+  -> Monday automation
+  -> Flask webhook
+  -> update-langfuse.sh
+  -> kubectl exec
+  -> PostgreSQL pod
+  -> Langfuse
+
+Components
+
+- Monday.com automation emits an event that triggers the webhook.
+- The Flask service receives the event and starts the update script.
+- The shell script uses kubectl exec to run SQL inside the PostgreSQL container.
+- The SQL updates database state that Langfuse reads and surfaces in its UI.

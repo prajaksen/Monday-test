@@ -1,0 +1,22 @@
+postgresql:
+  auth:
+    password: CHANGE_ME
+
+redis:
+  auth:
+    password: CHANGE_ME
+
+clickhouse:
+  auth:
+    password: CHANGE_ME
+
+langfuse:
+  encryptionKey:
+    value: CHANGE_ME
+
+  nextauth:
+    secret:
+      value: CHANGE_ME
+
+  salt:
+    value: CHANGE_ME
