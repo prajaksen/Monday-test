@@ -42,13 +42,8 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/langfuse-webhook:latest
 
-      - name: Deploy to Kubernetes
-        uses: azure/k8s-set-context@v4
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
-
-      - name: Apply manifests
+      - name: Deployment complete
         run: |
-          kubectl apply -f k8s/secret-template.yaml
-          kubectl apply -f k8s/deployment.yaml
+          echo "✓ Docker image built and pushed to GHCR"
+          echo "To deploy to Kubernetes, run:"
+          echo "  kubectl apply -f k8s/deployment.yaml"
