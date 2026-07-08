@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 
 def _first_non_empty(*values: Any) -> Optional[str]:
@@ -90,6 +91,11 @@ WHERE tenant_name = {sql_literal(tenant_name)} AND user_email = {sql_literal(use
 @app.route("/monday-webhook", methods=["POST"])
 def monday_webhook():
     """Receive a Monday.com-style webhook payload and trigger the SQL update flow."""
+    if WEBHOOK_SECRET:
+        provided_secret = request.headers.get("X-Webhook-Secret", "")
+        if provided_secret != WEBHOOK_SECRET:
+            return jsonify({"status": "forbidden", "error": "invalid webhook secret"}), 403
+
     payload = request.get_json(silent=True) or {}
     context = extract_monday_context(payload)
 
