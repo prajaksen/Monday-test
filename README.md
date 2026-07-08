@@ -20,7 +20,7 @@ The PoC mirrors the intended production path of:
 
 Monday.com automation
         ↓
-CircleCI
+CI/CD pipeline
         ↓
 AWS EKS
         ↓
@@ -31,7 +31,7 @@ Langfuse
 ## What is included
 
 - A Flask webhook that accepts HTTP POST requests from an external automation system.
-- A shell script that runs SQL against the Langfuse PostgreSQL pod using kubectl exec.
+- A shell script that turns Monday payload details into tenant/user mapping SQL and executes it against the PostgreSQL pod with kubectl exec.
 - Documentation for local setup, architecture, and a demo walkthrough.
 - A sample Helm values file that avoids committing secrets.
 
@@ -48,6 +48,21 @@ Langfuse
    ```
 4. Follow the setup guide in docs/setup.txt for a local Minikube + Langfuse deployment.
 5. Send a POST request to the webhook endpoint to trigger the SQL execution path.
+
+Example payload:
+
+```bash
+curl -X POST http://127.0.0.1:5000/monday-webhook \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "boardName": "Acme Corp",
+    "pulseId": 101,
+    "boardId": 202,
+    "userEmail": "jane@example.com",
+    "userName": "Jane Doe",
+    "event": {"type": "status_changed"}
+  }'
+```
 
 ## Security note
 
