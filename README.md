@@ -64,6 +64,40 @@ curl -X POST http://127.0.0.1:5000/monday-webhook \
   }'
 ```
 
+### Webhook endpoints
+
+- GET /healthz returns a simple health response: {"status":"ok"}
+- GET / returns a simple home page message: Langfuse Webhook Running
+- POST /monday-webhook accepts the Monday-style payload and triggers the SQL update flow
+
+### Troubleshooting connection refused
+
+If you open http://localhost:5000/ and see "Failed to load page" or ERR_CONNECTION_REFUSED, the webhook process is not listening on port 5000 yet.
+
+Check it with:
+
+```bash
+curl http://127.0.0.1:5000/healthz
+```
+
+If that fails, start the webhook locally:
+
+```bash
+python webhook.py
+```
+
+If you are accessing the service through Kubernetes instead of locally, run:
+
+```bash
+kubectl port-forward svc/langfuse-webhook 5000:80 -n langfuse
+```
+
+Then verify with:
+
+```bash
+curl http://127.0.0.1:5000/healthz
+```
+
 ## Security note
 
 Do not commit local secrets such as:

@@ -35,3 +35,26 @@ Then open http://localhost:3000 in a browser.
 python webhook.py
 
 The webhook listens on port 5000 by default.
+
+8. Verify the webhook is reachable
+
+curl http://127.0.0.1:5000/healthz
+
+Expected response:
+
+{"status":"ok"}
+
+If you see ERR_CONNECTION_REFUSED, the service is not running yet or the port-forward command is not active.
+
+- Start the webhook locally with: python webhook.py
+- Or expose the Kubernetes service locally with:
+
+kubectl port-forward svc/langfuse-webhook 5000:80 -n langfuse
+
+Then test again with:
+
+curl http://127.0.0.1:5000/healthz
+
+For Monday automation, use the webhook endpoint:
+
+POST http://127.0.0.1:5000/monday-webhook

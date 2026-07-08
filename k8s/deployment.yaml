@@ -15,6 +15,7 @@ spec:
       labels:
         app: langfuse-webhook
     spec:
+      serviceAccountName: langfuse-webhook
       containers:
         - name: webhook
           image: langfuse-webhook:local
