@@ -4,9 +4,17 @@ import subprocess
 from typing import Any, Dict, Optional
 
 from flask import Flask, jsonify, request
+from langfuse import Langfuse
 
 app = Flask(__name__)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+
+# Initialize Langfuse for observability
+langfuse = Langfuse(
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY", ""),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY", ""),
+    host=os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+)
 
 
 def get_postgres_password() -> str:
@@ -52,10 +60,22 @@ def _first_non_empty(*values: Any) -> Optional[str]:
 
 
 def extract_monday_context(payload: Dict[str, Any]) -> Dict[str, str]:
-    event_payload = payload.get("event") or {}
-    board_payload = payload.get("board") or {}
-    item_payload = payload.get("item") or {}
-    user_payload = payload.get("user") or {}
+    # Handle both dict and string values for event
+    event_payload = payload.get("event")
+    if not isinstance(event_payload, dict):
+        event_payload = {}
+    
+    board_payload = payload.get("board")
+    if not isinstance(board_payload, dict):
+        board_payload = {}
+    
+    item_payload = payload.get("item")
+    if not isinstance(item_payload, dict):
+        item_payload = {}
+    
+    user_payload = payload.get("user")
+    if not isinstance(user_payload, dict):
+        user_payload = {}
 
     tenant_name = _first_non_empty(
         payload.get("tenantName"),
@@ -123,17 +143,42 @@ WHERE tenant_name = {sql_literal(tenant_name)} AND user_email = {sql_literal(use
 @app.route("/monday-webhook", methods=["POST"])
 def monday_webhook():
     """Receive a Monday.com-style webhook payload and trigger the SQL update flow."""
+    # Start a trace in Langfuse
+    trace_name = "monday-webhook"
+    payload = request.get_json(silent=True) or {}
+    
+    # Log webhook receipt to Langfuse
+    trace_context = {
+        "source": "monday",
+        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+    }
+    
     if WEBHOOK_SECRET:
         provided_secret = request.headers.get("X-Webhook-Secret", "")
         if provided_secret != WEBHOOK_SECRET:
+            langfuse.log_event(
+                name="webhook-auth-failed",
+                event_name="auth_check",
+                input={"secret_provided": bool(provided_secret)},
+            )
             return jsonify({"status": "forbidden", "error": "invalid webhook secret"}), 403
+        
+        langfuse.create_event(
+            name="webhook-auth-success",
+            input={"secret_provided": bool(provided_secret)},
+        )
 
-    payload = request.get_json(silent=True) or {}
     context = extract_monday_context(payload)
 
     print("=" * 60)
     print("Webhook received")
     print(json.dumps(payload, indent=2, default=str))
+    
+    # Log context extraction
+    langfuse.create_event(
+        name="context-extracted",
+        input=json.dumps(context),
+    )
 
     env = os.environ.copy()
     
@@ -157,20 +202,37 @@ def monday_webhook():
     )
 
     script_path = os.path.join(os.path.dirname(__file__), "scripts", "update-langfuse.sh")
+    
     result = subprocess.run(["bash", script_path], capture_output=True, text=True, env=env)
 
     print(result.stdout)
     if result.stderr:
         print(result.stderr)
-
-    return jsonify(
-        {
-            "status": "success" if result.returncode == 0 else "error",
-            "context": context,
-            "output": result.stdout,
-            "error": result.stderr,
-        }
+    
+    # Log the SQL execution to Langfuse
+    langfuse.create_event(
+        name="sql-execution",
+        input=json.dumps({
+            "tenant_name": context["tenant_name"],
+            "user_email": context["user_email"],
+            "command": "update-langfuse.sh",
+        }),
     )
+    
+    response = {
+        "status": "success" if result.returncode == 0 else "error",
+        "context": context,
+        "output": result.stdout,
+        "error": result.stderr,
+    }
+    
+    # Log final webhook response
+    langfuse.create_event(
+        name="webhook-completed",
+        input=json.dumps({"status": response.get("status"), "context": response.get("context")}),
+    )
+    
+    return jsonify(response)
 
 
 @app.route("/healthz", methods=["GET"])
@@ -184,4 +246,4 @@ def home():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)
