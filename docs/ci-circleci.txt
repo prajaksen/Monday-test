@@ -1,0 +1,18 @@
+CircleCI job idea for the PoC
+
+1. Trigger the job from Monday automation or a manual webhook.
+2. The job checks out this repository.
+3. The job sets the required environment variables:
+   - POSTGRES_PASSWORD
+   - NAMESPACE
+   - POSTGRES_POD
+   - POSTGRES_DB
+   - POSTGRES_USER
+   - MONDAY_TENANT_NAME
+   - MONDAY_USER_EMAIL
+   - MONDAY_ITEM_ID
+   - MONDAY_BOARD_ID
+   - MONDAY_STATUS
+4. The job runs the SQL update script:
+   bash scripts/update-langfuse.sh
+5. The job can optionally post the output to a Slack or Monday update channel.

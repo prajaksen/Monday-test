@@ -9,6 +9,38 @@ app = Flask(__name__)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 
+def get_postgres_password() -> str:
+    """Fetch PostgreSQL password from Kubernetes secret or environment."""
+    # Try environment first
+    if os.environ.get("POSTGRES_PASSWORD"):
+        return os.environ.get("POSTGRES_PASSWORD", "")
+    
+    # Try to fetch from Kubernetes
+    try:
+        result = subprocess.run(
+            [
+                "kubectl",
+                "get",
+                "secret",
+                "-n",
+                "langfuse",
+                "langfuse-postgresql",
+                "-o",
+                "jsonpath={.data.password}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout:
+            import base64
+            return base64.b64decode(result.stdout).decode("utf-8")
+    except Exception as e:
+        print(f"Failed to fetch password from Kubernetes: {e}")
+    
+    return ""
+
+
 def _first_non_empty(*values: Any) -> Optional[str]:
     for value in values:
         if value is None:
@@ -104,6 +136,10 @@ def monday_webhook():
     print(json.dumps(payload, indent=2, default=str))
 
     env = os.environ.copy()
+    
+    # Explicitly fetch and set POSTGRES_PASSWORD
+    postgres_password = get_postgres_password()
+    
     env.update(
         {
             "MONDAY_TENANT_NAME": context["tenant_name"],
@@ -112,6 +148,11 @@ def monday_webhook():
             "MONDAY_BOARD_ID": context["monday_board_id"],
             "MONDAY_STATUS": context["status"],
             "MONDAY_PAYLOAD_JSON": json.dumps(payload, default=str),
+            "NAMESPACE": env.get("NAMESPACE", "langfuse"),
+            "POSTGRES_POD": env.get("POSTGRES_POD", "langfuse-postgresql-0"),
+            "POSTGRES_DB": env.get("POSTGRES_DB", "postgres_langfuse"),
+            "POSTGRES_USER": env.get("POSTGRES_USER", "postgres"),
+            "POSTGRES_PASSWORD": postgres_password,
         }
     )
 

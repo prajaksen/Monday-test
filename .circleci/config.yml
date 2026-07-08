@@ -1,0 +1,26 @@
+version: 2.1
+
+jobs:
+  run-langfuse-update:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Install kubectl and curl
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y curl
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/kubectl
+      - run:
+          name: Run Langfuse update script
+          command: |
+            bash scripts/update-langfuse.sh
+
+workflows:
+  version: 2
+  langfuse-poc:
+    jobs:
+      - run-langfuse-update
