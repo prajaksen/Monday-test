@@ -1,5 +1,7 @@
 import os
 import json
+import requests
+import base64
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
@@ -34,7 +36,9 @@ def init_telemetry(service_name: str = "langfuse-poc"):
 
     Environment variables:
       LANGFUSE_OTLP_ENDPOINT - full OTLP HTTP endpoint (defaults to http://localhost:3000/api/public/otel/v1/traces)
-      LANGFUSE_API_KEY - optional Bearer token to send in Authorization header
+            LANGFUSE_API_KEY - optional Bearer token to send in Authorization header
+            LANGFUSE_SECRET_KEY - optional explicit secret key (sk-...)
+            LANGFUSE_PUBLIC_KEY - optional public key (pk-...) to send as X-Langfuse-Public-Key
     """
     # Priority: explicit OTLP endpoint > LANGFUSE_BASE_URL > LANGFUSE_HOST > default
     base = os.getenv("LANGFUSE_OTLP_ENDPOINT") or os.getenv("LANGFUSE_BASE_URL") or os.getenv(
@@ -42,13 +46,41 @@ def init_telemetry(service_name: str = "langfuse-poc"):
     )
     endpoint = base.rstrip("/") + "/api/public/otel/v1/traces"
     # Langfuse OTLP export requires the secret key, not the public key.
-    api_key = os.getenv("LANGFUSE_API_KEY") or os.getenv("LANGFUSE_SECRET_KEY")
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY") or os.getenv("LANGFUSE_PUBLIC") or os.getenv("LANGFUSE_PUB_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY") or os.getenv("LANGFUSE_API_KEY")
     headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    if public_key and secret_key:
+        auth = base64.b64encode(f"{public_key}:{secret_key}".encode("utf-8")).decode("utf-8")
+        headers["Authorization"] = f"Basic {auth}"
+        headers["x-langfuse-ingestion-version"] = "4"
+
+    print("[telemetry] OTLP endpoint:", endpoint)
+    print("[telemetry] auth header set:", bool(headers.get("Authorization")))
+    # Print which headers will be sent, mask the values for safety
+    def _mask(v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        if len(v) <= 12:
+            return v[:4] + "..."
+        return v[:8] + "..." + v[-4:]
+
+    masked = {k: _mask(v) for k, v in headers.items()}
+    print("[telemetry] outbound headers:", json.dumps(masked))
+    print("[telemetry] service name:", service_name)
 
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
+
+    # Direct HTTP test to verify headers arrive unchanged at Langfuse
+    print("\n=== Direct HTTP Test ===")
+    try:
+        resp = requests.post(endpoint, headers=headers, json={})
+        print("Status:", resp.status_code)
+        print("Body:", resp.text)
+    except Exception as e:
+        print("Direct HTTP Test error:", str(e))
+    print("========================\n")
+
     exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)

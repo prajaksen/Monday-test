@@ -1,0 +1,379 @@
+config:
+  connectors:
+    routing/tenant:
+      default_pipelines:
+      - traces/default
+      error_mode: ignore
+      table:
+      - condition: attributes["oro.tenantId"] == "tenant_020"
+        context: span
+        pipelines:
+        - traces/tenant_020
+      - condition: attributes["oro.tenantId"] == "tenant_047"
+        context: span
+        pipelines:
+        - traces/tenant_046
+      - condition: attributes["oro.tenantId"] == "tenant_008"
+        context: span
+        pipelines:
+        - traces/tenant_007
+      - condition: attributes["oro.tenantId"] == "tenant_042"
+        context: span
+        pipelines:
+        - traces/tenant_039
+      - condition: attributes["oro.tenantId"] == "tenant_016"
+        context: span
+        pipelines:
+        - traces/tenant_015
+      - condition: attributes["oro.tenantId"] == "tenant_019"
+        context: span
+        pipelines:
+        - traces/tenant_018
+      - condition: attributes["oro.tenantId"] == "tenant_003"
+        context: span
+        pipelines:
+        - traces/tenant_004
+      - condition: attributes["oro.tenantId"] == "tenant_010"
+        context: span
+        pipelines:
+        - traces/tenant_009
+      - condition: attributes["oro.tenantId"] == "tenant_061"
+        context: span
+        pipelines:
+        - traces/tenant_060
+  exporters:
+    awss3:
+      marshaler: otlp_json
+      s3uploader:
+        region: us-west-2
+        s3_bucket: oro-kinesis-dev
+        s3_prefix: snowflake/otel-traces
+    clickhouse:
+      create_schema: true
+      database: openlit
+      endpoint: tcp://openlit-db.llm-monitoring.svc.cluster.local:9000?dial_timeout=10s
+      logs_table_name: otel_logs
+      metrics_table_name: otel_metrics
+      password: <REDACTED>
+      traces_table_name: otel_traces
+      ttl: 72h
+      username: default
+    debug:
+      verbosity: basic
+    # PATCHED: send both secret (Authorization) and public key header
+    otlphttp/langfuse:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_004:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_007:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_009:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_015:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_018:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_020:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_039:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_046:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+    otlphttp/langfuse_tenant_060:
+      endpoint: http://langfuse-web.llm-monitoring.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Bearer sk-lf-2b328a01-89ce-452b-ba0f-b8ccfbebe7fa"
+        X-Langfuse-Public-Key: "pk-lf-e94a3f39-5dba-4061-b627-42691a3d20d4"
+  extensions:
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133
+  processors:
+    attributes:
+      actions:
+      - action: upsert
+        from_attribute: tenant_id
+        key: <REDACTED>
+      - action: upsert
+        key: <REDACTED>
+        value: llm-monitoring
+    tenant_006ch:
+      send_tenant_006ch_size: 512
+      timeout: 10s
+    filter/drop-infra-noise:
+      error_mode: ignore
+      traces:
+        span:
+        - IsMatch(name, "^task ")
+        - IsMatch(name, "^(SELECT|INSERT|UPDATE|DELETE|CALL|CREATE|ALTER|DROP) ")
+        - IsMatch(name, "^(GET|POST|PUT|DELETE|PATCH) /actuator")
+        - IsMatch(name, "^(GET|POST|PUT|DELETE|PATCH) /health")
+        - name == "healthcheck"
+        - IsMatch(name, "^HikariPool")
+        - IsMatch(name, "^tenant_055\\.")
+    memory_limiter:
+      check_interval: 5s
+      limit_mib: 400
+      limit_percentage: 80
+      spike_limit_mib: 100
+      spike_limit_percentage: 25
+    transform/langfuse:
+      trace_statements:
+      - context: span
+        statements:
+        - set(attributes["langfuse.trace.name"], attributes["oro.llm.operation"]) where attributes["oro.llm.operation"] !=
+          nil
+        - set(attributes["langfuse.trace.name"], name) where attributes["langfuse.trace.name"] == nil
+        - set(attributes["langfuse.user.id"], attributes["oro.tenantId"]) where attributes["oro.tenantId"] != nil
+        - set(attributes["langfuse.session.id"], attributes["oro.requestId"]) where attributes["oro.requestId"] != nil
+        - set(attributes["langfuse.observation.type"], "AGENT") where (name == "oro.agent.trace" or name == "oro.assistant.evaluate")
+          and attributes["langfuse.observation.type"] == nil
+        - set(attributes["langfuse.observation.input"], attributes["oro.agent.input"]) where attributes["oro.agent.input"]
+          != nil and attributes["langfuse.observation.input"] == nil
+        - set(attributes["langfuse.observation.output"], attributes["oro.agent.output"]) where attributes["oro.agent.output"]
+          != nil and attributes["langfuse.observation.output"] == nil
+        - set(attributes["langfuse.trace.metadata.tenantId"], attributes["oro.tenantId"]) where attributes["oro.tenantId"]
+          != nil
+        - set(attributes["langfuse.trace.metadata.requestId"], attributes["oro.requestId"]) where attributes["oro.requestId"]
+          != nil
+        - set(attributes["langfuse.trace.metadata.model"], attributes["gen_ai.request.model"]) where attributes["gen_ai.request.model"]
+          != nil
+        - set(attributes["langfuse.trace.metadata.provider"], attributes["oro.llm.provider"]) where attributes["oro.llm.provider"]
+          != nil
+        - set(attributes["langfuse.trace.output"], attributes["langfuse.observation.output"]) where parent_span_id.string
+          == "" and attributes["langfuse.trace.output"] == nil and attributes["langfuse.observation.output"] != nil
+        - set(attributes["langfuse.trace.input"], attributes["langfuse.observation.input"]) where parent_span_id.string ==
+          "" and attributes["langfuse.trace.input"] == nil and attributes["langfuse.observation.input"] != nil
+        - set(attributes["langfuse.trace.output"], attributes["langfuse.observation.output"]) where name == "oro.tool.call"
+          and attributes["langfuse.observation.output"] != nil
+        - set(attributes["langfuse.trace.input"], attributes["langfuse.observation.input"]) where name == "oro.tool.call"
+          and attributes["langfuse.observation.input"] != nil
+        - set(attributes["langfuse.trace.output"], attributes["langfuse.observation.output"]) where attributes["oro.llm.operation"]
+          != nil and attributes["langfuse.observation.output"] != nil
+        - set(attributes["langfuse.trace.input"], attributes["langfuse.observation.input"]) where attributes["oro.llm.operation"]
+          != nil and attributes["langfuse.observation.input"] != nil
+        - set(attributes["langfuse.trace.metadata.requestId"], attributes["oro.traceId"]) where attributes["langfuse.trace.metadata.requestId"]
+          == nil and attributes["oro.traceId"] != nil
+        - set(attributes["langfuse.environment"], "dev")
+  receivers:
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: ${env:MY_POD_IP}:14250
+        thrift_compact:
+          endpoint: ${env:MY_POD_IP}:6831
+        thrift_http:
+          endpoint: ${env:MY_POD_IP}:14268
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    prometheus:
+      config:
+        scrape_configs:
+        - job_name: opentelemetry-collector
+          scrape_interval: 10s
+          static_configs:
+          - targets:
+            - ${env:MY_POD_IP}:8888
+    zipkin:
+      endpoint: ${env:MY_POD_IP}:9411
+  service:
+    extensions:
+    - health_check
+    pipelines:
+      logs:
+        exporters:
+        - debug
+        processors:
+        - memory_limiter
+        - tenant_006ch
+        receivers:
+        - otlp
+      metrics:
+        exporters:
+        - clickhouse
+        - debug
+        processors:
+        - memory_limiter
+        - tenant_006ch
+        receivers:
+        - otlp
+      traces:
+        exporters:
+        - debug
+        processors:
+        - memory_limiter
+        - tenant_006ch
+        receivers:
+        - otlp
+        - jaeger
+        - zipkin
+      traces/tenant_004:
+        exporters:
+        - otlphttp/langfuse_tenant_004
+        receivers:
+        - routing/tenant
+      traces/tenant_007:
+        exporters:
+        - otlphttp/langfuse_tenant_007
+        receivers:
+        - routing/tenant
+      traces/tenant_009:
+        exporters:
+        - otlphttp/langfuse_tenant_009
+        receivers:
+        - routing/tenant
+      traces/tenant_015:
+        exporters:
+        - otlphttp/langfuse_tenant_015
+        receivers:
+        - routing/tenant
+      traces/default:
+        exporters:
+        - otlphttp/langfuse
+        receivers:
+        - routing/tenant
+      traces/tenant_018:
+        exporters:
+        - otlphttp/langfuse_tenant_018
+        receivers:
+        - routing/tenant
+      traces/tenant_020:
+        exporters:
+        - otlphttp/langfuse_tenant_020
+        receivers:
+        - routing/tenant
+      traces/tenant_039:
+        exporters:
+        - otlphttp/langfuse_tenant_039
+        receivers:
+        - routing/tenant
+      traces/tenant_046:
+        exporters:
+        - otlphttp/langfuse_tenant_046
+        receivers:
+        - routing/tenant
+      traces/pre-route:
+        exporters:
+        - clickhouse
+        - awss3
+        - debug
+        - routing/tenant
+        processors:
+        - memory_limiter
+        - filter/drop-infra-noise
+        - transform/langfuse
+        - attributes
+        - tenant_006ch
+        receivers:
+        - otlp
+      traces/tenant_060:
+        exporters:
+        - otlphttp/langfuse_tenant_060
+        receivers:
+        - routing/tenant
+    telemetry:
+      metrics:
+        readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: ${env:MY_POD_IP}
+                port: 8888
+      resource:
+        host.name: ${env:OTEL_K8S_NODE_NAME}
+        k8s.namespace.name: ${env:OTEL_K8S_NAMESPACE}
+        k8s.node.ip: ${env:OTEL_K8S_NODE_IP}
+        k8s.node.name: ${env:OTEL_K8S_NODE_NAME}
+        k8s.pod.ip: ${env:OTEL_K8S_POD_IP}
+        k8s.pod.name: ${env:OTEL_K8S_POD_NAME}
+extraEnvs:
+extraEnvs:
+- name: REPLACE_ENV_NAME_1
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_1
+      key: REPLACE_SECRET_KEY_1
+- name: REPLACE_ENV_NAME_2
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_2
+      key: REPLACE_SECRET_KEY_2
+- name: REPLACE_ENV_NAME_3
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_3
+      key: REPLACE_SECRET_KEY_3
+- name: REPLACE_ENV_NAME_4
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_4
+      key: REPLACE_SECRET_KEY_4
+- name: REPLACE_ENV_NAME_5
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_5
+      key: REPLACE_SECRET_KEY_5
+- name: REPLACE_ENV_NAME_6
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_6
+      key: REPLACE_SECRET_KEY_6
+- name: REPLACE_ENV_NAME_7
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_7
+      key: REPLACE_SECRET_KEY_7
+- name: REPLACE_ENV_NAME_8
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_8
+      key: REPLACE_SECRET_KEY_8
+- name: REPLACE_ENV_NAME_9
+  valueFrom:
+    secretKeyRef:
+      name: REPLACE_K8S_SECRET_NAME_9
+      key: REPLACE_SECRET_KEY_9
+image:
+  repository: otel/opentelemetry-collector-contrib
+mode: deployment
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: <REDACTED-ARN>
