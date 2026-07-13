@@ -1,109 +1,78 @@
-# Monday → Kubernetes → Langfuse PoC
+# Langfuse AI Chatbot PoC
 
-## Objective
+## Overview
 
-This repository contains a lightweight proof of concept that demonstrates a future production flow:
+This project now provides a small Flask-based AI chatbot backed by Ollama and instrumented with Langfuse. It also retains the original Monday webhook workflow so the repository can still support the earlier PoC use case.
 
-Monday.com automation
-        ↓
-Webhook
-        ↓
-Shell script
-        ↓
-Kubernetes
-        ↓
-PostgreSQL
-        ↓
-Langfuse
+## Features
 
-The PoC mirrors the intended production path of:
+- Flask REST API with a POST /chat endpoint
+- Local Ollama integration using llama3.2 by default
+- Langfuse tracing with a trace per request and spans for:
+  - request validation
+  - LLM call
+  - response generation
+- Health endpoint at GET /health and GET /healthz
+- Docker and Docker Compose support
+- Kubernetes Deployment and Service manifests
 
-Monday.com automation
-        ↓
-CI/CD pipeline
-        ↓
-AWS EKS
-        ↓
-PostgreSQL
-        ↓
-Langfuse
-
-## What is included
-
-- A Flask webhook that accepts HTTP POST requests from an external automation system.
-- A shell script that turns Monday payload details into tenant/user mapping SQL and executes it against the PostgreSQL pod with kubectl exec.
-- Documentation for local setup, architecture, and a demo walkthrough.
-- A sample Helm values file that avoids committing secrets.
-
-## Quick start
+## Local setup
 
 1. Create and activate a Python virtual environment.
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Start the webhook:
+3. Copy the environment template and adjust the values if needed:
    ```bash
-   python webhook.py
+   cp .env.example .env
    ```
-4. Follow the setup guide in docs/setup.txt for a local Minikube + Langfuse deployment.
-5. Send a POST request to the webhook endpoint to trigger the SQL execution path.
+4. Run Ollama locally and make sure a model is available. For example:
+   ```bash
+   ollama pull llama3.2
+   ```
+5. Start the Flask app:
+   ```bash
+   python app.py
+   ```
 
-Example payload:
+## Endpoints
+
+- GET /health returns a simple health response
+- POST /chat accepts a JSON payload like:
+  ```bash
+  curl -X POST http://127.0.0.1:5000/chat \
+    -H 'Content-Type: application/json' \
+    -d '{"message":"Hello"}'
+  ```
+- POST /monday-webhook keeps the original webhook workflow
+
+## Docker
+
+Build and run the app with Docker:
 
 ```bash
-curl -X POST http://127.0.0.1:5000/monday-webhook \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "boardName": "Acme Corp",
-    "pulseId": 101,
-    "boardId": 202,
-    "userEmail": "jane@example.com",
-    "userName": "Jane Doe",
-    "event": {"type": "status_changed"}
-  }'
+docker build -t langfuse-chatbot .
+docker run --rm -p 5000:5000 --env-file .env langfuse-chatbot
 ```
 
-### Webhook endpoints
-
-- GET /healthz returns a simple health response: {"status":"ok"}
-- GET / returns a simple home page message: Langfuse Webhook Running
-- POST /monday-webhook accepts the Monday-style payload and triggers the SQL update flow
-
-### Troubleshooting connection refused
-
-If you open http://localhost:5000/ and see "Failed to load page" or ERR_CONNECTION_REFUSED, the webhook process is not listening on port 5000 yet.
-
-Check it with:
+## Docker Compose
 
 ```bash
-curl http://127.0.0.1:5000/healthz
+docker compose up --build
 ```
 
-If that fails, start the webhook locally:
+## Kubernetes
 
 ```bash
-python webhook.py
-```
-
-If you are accessing the service through Kubernetes instead of locally, run:
-
-```bash
-kubectl port-forward svc/langfuse-webhook 5000:80 -n langfuse
-```
-
-Then verify with:
-
-```bash
-curl http://127.0.0.1:5000/healthz
+kubectl apply -f k8s/deployment.yaml
+kubectl port-forward svc/langfuse-chatbot 5000:80 -n langfuse
 ```
 
 ## Security note
 
 Do not commit local secrets such as:
 
-- values-local.yaml
 - .env
 - Langfuse API keys
 - PostgreSQL passwords
-- ngrok authtokens

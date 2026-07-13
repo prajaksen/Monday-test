@@ -1,24 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: langfuse-webhook
+  name: langfuse-chatbot
   namespace: langfuse
   labels:
-    app: langfuse-webhook
+    app: langfuse-chatbot
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: langfuse-webhook
+      app: langfuse-chatbot
   template:
     metadata:
       labels:
-        app: langfuse-webhook
+        app: langfuse-chatbot
     spec:
-      serviceAccountName: langfuse-webhook
       containers:
-        - name: webhook
-          image: langfuse-webhook:local
+        - name: chatbot
+          image: langfuse-chatbot:local
           imagePullPolicy: Never
           ports:
             - containerPort: 5000
@@ -30,28 +29,34 @@ spec:
                 secretKeyRef:
                   name: langfuse-webhook-secrets
                   key: webhook-secret
-            - name: NAMESPACE
-              value: langfuse
-            - name: POSTGRES_POD
-              value: langfuse-postgresql-0
-            - name: POSTGRES_DB
-              value: postgres_langfuse
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
+                  optional: true
+            - name: LANGFUSE_HOST
+              value: http://langfuse:3000
+            - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
                   name: langfuse-webhook-secrets
-                  key: postgres-password
+                  key: langfuse-public-key
+                  optional: true
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-webhook-secrets
+                  key: langfuse-secret-key
+                  optional: true
+            - name: OLLAMA_BASE_URL
+              value: http://ollama:11434
+            - name: OLLAMA_MODEL
+              value: llama3.2
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /health
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /health
               port: 5000
             initialDelaySeconds: 10
             periodSeconds: 20
@@ -59,11 +64,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: langfuse-webhook
+  name: langfuse-chatbot
   namespace: langfuse
 spec:
   selector:
-    app: langfuse-webhook
+    app: langfuse-chatbot
   ports:
     - protocol: TCP
       port: 80

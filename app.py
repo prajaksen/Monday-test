@@ -1,29 +1,31 @@
 import json
 import os
 import subprocess
+import time
+import uuid
 from typing import Any, Dict, Optional
-
+import requests
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
-from langfuse import Langfuse
+
+load_dotenv()
+
+from telemetry import init_telemetry, traced_span
 
 app = Flask(__name__)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
-# Initialize Langfuse for observability
-langfuse = Langfuse(
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY", ""),
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY", ""),
-    host=os.getenv("LANGFUSE_HOST", "http://localhost:3000")
-)
+# Initialize OpenTelemetry (OTLP -> Langfuse)
+init_telemetry(service_name=os.getenv("OTEL_SERVICE_NAME", "langfuse-poc"))
 
 
 def get_postgres_password() -> str:
     """Fetch PostgreSQL password from Kubernetes secret or environment."""
-    # Try environment first
     if os.environ.get("POSTGRES_PASSWORD"):
         return os.environ.get("POSTGRES_PASSWORD", "")
-    
-    # Try to fetch from Kubernetes
+
     try:
         result = subprocess.run(
             [
@@ -42,10 +44,11 @@ def get_postgres_password() -> str:
         )
         if result.returncode == 0 and result.stdout:
             import base64
+
             return base64.b64decode(result.stdout).decode("utf-8")
-    except Exception as e:
-        print(f"Failed to fetch password from Kubernetes: {e}")
-    
+    except Exception as exc:
+        print(f"Failed to fetch password from Kubernetes: {exc}")
+
     return ""
 
 
@@ -59,20 +62,40 @@ def _first_non_empty(*values: Any) -> Optional[str]:
     return None
 
 
+def _serialize_span_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, default=str)
+    return str(value)
+
+
+def _set_span_attribute(span: Any, key: str, value: Any) -> None:
+    if span is None:
+        return
+    setter = getattr(span, "set_attribute", None)
+    if callable(setter):
+        try:
+            setter(key, _serialize_span_value(value))
+        except Exception:
+            pass
+
+
 def extract_monday_context(payload: Dict[str, Any]) -> Dict[str, str]:
-    # Handle both dict and string values for event
     event_payload = payload.get("event")
     if not isinstance(event_payload, dict):
         event_payload = {}
-    
+
     board_payload = payload.get("board")
     if not isinstance(board_payload, dict):
         board_payload = {}
-    
+
     item_payload = payload.get("item")
     if not isinstance(item_payload, dict):
         item_payload = {}
-    
+
     user_payload = payload.get("user")
     if not isinstance(user_payload, dict):
         user_payload = {}
@@ -98,14 +121,13 @@ def extract_monday_context(payload: Dict[str, Any]) -> Dict[str, str]:
         else:
             user_email = "unknown-user@unknown.local"
 
-    context = {
+    return {
         "tenant_name": tenant_name,
         "user_email": user_email,
         "monday_item_id": _first_non_empty(payload.get("pulseId"), payload.get("itemId"), item_payload.get("id")) or "",
         "monday_board_id": _first_non_empty(payload.get("boardId"), board_payload.get("id"), payload.get("board_id")) or "",
         "status": _first_non_empty(event_payload.get("type"), payload.get("status"), payload.get("eventType")) or "updated",
     }
-    return context
 
 
 def render_tenant_user_sql(tenant_name: str, user_email: str, monday_item_id: str, monday_board_id: str, status: str) -> str:
@@ -140,51 +162,95 @@ WHERE tenant_name = {sql_literal(tenant_name)} AND user_email = {sql_literal(use
 """
 
 
+def call_ollama(prompt: str, model: str = OLLAMA_MODEL) -> str:
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+    }
+
+    response = requests.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=30)
+    response.raise_for_status()
+    body = response.json()
+    return body.get("response", "")
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    request_id = str(uuid.uuid4())
+    started_at = time.perf_counter()
+    message = None
+    response_text = ""
+    error_message = None
+
+    with traced_span(
+        "chat.request",
+        request_id,
+        {
+            "model.name": OLLAMA_MODEL,
+            "request.id": request_id,
+        },
+    ) as root_span:
+        try:
+            payload = request.get_json(silent=True) or {}
+            with traced_span("request.validation", request_id, {"input": payload}) as validation_span:
+                message = payload.get("message")
+                if not isinstance(message, str) or not message.strip():
+                    error_message = "message is required"
+                    _set_span_attribute(validation_span, "validation.result", "invalid")
+                    _set_span_attribute(validation_span, "errors", error_message)
+                    _set_span_attribute(root_span, "errors", error_message)
+                    return jsonify({"error": error_message, "request_id": request_id}), 400
+
+                _set_span_attribute(validation_span, "validation.result", "valid")
+                _set_span_attribute(validation_span, "user.prompt", message)
+
+            with traced_span("llm.call", request_id, {"model.name": OLLAMA_MODEL, "user.prompt": message}) as llm_span:
+                response_text = call_ollama(message)
+                _set_span_attribute(llm_span, "response", response_text)
+
+            with traced_span("response.generation", request_id, {"response": response_text}) as generation_span:
+                latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
+                _set_span_attribute(root_span, "user.prompt", message)
+                _set_span_attribute(root_span, "response", response_text)
+                _set_span_attribute(root_span, "latency.ms", latency_ms)
+                _set_span_attribute(root_span, "model.name", OLLAMA_MODEL)
+                _set_span_attribute(root_span, "errors", "")
+                _set_span_attribute(generation_span, "latency.ms", latency_ms)
+                return jsonify({"response": response_text, "request_id": request_id}), 200
+        except Exception as exc:
+            error_message = str(exc)
+            latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            _set_span_attribute(root_span, "errors", error_message)
+            _set_span_attribute(root_span, "latency.ms", latency_ms)
+            _set_span_attribute(root_span, "model.name", OLLAMA_MODEL)
+            if hasattr(root_span, "record_exception"):
+                try:
+                    root_span.record_exception(exc)
+                except Exception:
+                    pass
+            return jsonify({"error": error_message, "request_id": request_id}), 500
+
+
 @app.route("/monday-webhook", methods=["POST"])
 def monday_webhook():
     """Receive a Monday.com-style webhook payload and trigger the SQL update flow."""
-    # Start a trace in Langfuse
-    trace_name = "monday-webhook"
     payload = request.get_json(silent=True) or {}
-    
-    # Log webhook receipt to Langfuse
-    trace_context = {
-        "source": "monday",
-        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
-    }
-    
+
     if WEBHOOK_SECRET:
         provided_secret = request.headers.get("X-Webhook-Secret", "")
         if provided_secret != WEBHOOK_SECRET:
-            langfuse.log_event(
-                name="webhook-auth-failed",
-                event_name="auth_check",
-                input={"secret_provided": bool(provided_secret)},
-            )
             return jsonify({"status": "forbidden", "error": "invalid webhook secret"}), 403
-        
-        langfuse.create_event(
-            name="webhook-auth-success",
-            input={"secret_provided": bool(provided_secret)},
-        )
 
     context = extract_monday_context(payload)
 
     print("=" * 60)
     print("Webhook received")
     print(json.dumps(payload, indent=2, default=str))
-    
-    # Log context extraction
-    langfuse.create_event(
-        name="context-extracted",
-        input=json.dumps(context),
-    )
 
     env = os.environ.copy()
-    
-    # Explicitly fetch and set POSTGRES_PASSWORD
     postgres_password = get_postgres_password()
-    
+
     env.update(
         {
             "MONDAY_TENANT_NAME": context["tenant_name"],
@@ -202,48 +268,32 @@ def monday_webhook():
     )
 
     script_path = os.path.join(os.path.dirname(__file__), "scripts", "update-langfuse.sh")
-    
     result = subprocess.run(["bash", script_path], capture_output=True, text=True, env=env)
 
     print(result.stdout)
     if result.stderr:
         print(result.stderr)
-    
-    # Log the SQL execution to Langfuse
-    langfuse.create_event(
-        name="sql-execution",
-        input=json.dumps({
-            "tenant_name": context["tenant_name"],
-            "user_email": context["user_email"],
-            "command": "update-langfuse.sh",
-        }),
-    )
-    
+
     response = {
         "status": "success" if result.returncode == 0 else "error",
         "context": context,
         "output": result.stdout,
         "error": result.stderr,
     }
-    
-    # Log final webhook response
-    langfuse.create_event(
-        name="webhook-completed",
-        input=json.dumps({"status": response.get("status"), "context": response.get("context")}),
-    )
-    
+
     return jsonify(response)
 
 
+@app.route("/health", methods=["GET"])
 @app.route("/healthz", methods=["GET"])
-def healthz():
+def health():
     return jsonify({"status": "ok"})
 
 
 @app.route("/")
 def home():
-    return "Langfuse Webhook Running"
+    return "Langfuse AI Chatbot Running"
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(host="0.0.0.0", port=5000)
