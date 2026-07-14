@@ -19,7 +19,7 @@ data:
         limit_mib: 1024
         spike_limit_mib: 200
 
-      k8sattributes:
+      k8s_attributes:
         auth_type: serviceAccount
         passthrough: false
 
@@ -43,13 +43,13 @@ data:
         send_batch_max_size: 512
 
     exporters:
-      otlp:
+      otlp_grpc:
         endpoint: ${env:LANGFUSE_OTLP_ENDPOINT}
         tls:
           insecure: true
 
       prometheus:
-        endpoint: 0.0.0.0:8888
+        endpoint: 0.0.0.0:8889
 
     extensions:
       health_check:
@@ -66,8 +66,8 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource, batch]
-          exporters: [otlp]
+          processors: [memory_limiter, k8s_attributes, resource, batch]
+          exporters: [otlp_grpc]
 
         metrics:
           receivers: [otlp]
