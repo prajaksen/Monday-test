@@ -1,13 +1,16 @@
 version: '3.8'
 services:
   otel-collector:
-    image: otel/opentelemetry-collector:latest
+    image: otel/opentelemetry-collector-contrib:0.156.0
     ports:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
+      - "8888:8888" # Prometheus metrics
+      - "13133:13133" # Health check
     volumes:
       - ./collector-config.yaml:/etc/otel-collector-config.yaml:ro
     environment:
+      - "LANGFUSE_OTLP_ENDPOINT=http://localhost:4317"
       - "CLOUD_PROVIDER=aws"
       - "CLOUD_PLATFORM=eks"
       - "DEPLOYMENT_ENV=local"

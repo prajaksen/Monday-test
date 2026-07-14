@@ -1,7 +1,7 @@
 replicaCount: 1
 image:
-  repository: otel/opentelemetry-collector
-  tag: latest
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.156.0"
 serviceAccount:
   create: true
   annotations: {}
@@ -16,20 +16,54 @@ autoscaling:
   enabled: false
 collector:
   configFile: |-
-    # use the local development collector config
     receivers:
       otlp:
         protocols:
-          grpc: {}
-          http: {}
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
     processors:
-      batch: {}
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 1024
+        spike_limit_mib: 200
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+      resource:
+        attributes:
+          - key: cloud.provider
+            action: upsert
+            value: aws
+          - key: cloud.platform
+            action: upsert
+            value: eks
+          - key: deployment.environment
+            action: upsert
+            value: development
+      batch:
+        timeout: 10s
+        send_batch_size: 512
+        send_batch_max_size: 512
     exporters:
       otlp:
-        endpoint: "langfuse:4317"
+        endpoint: ${env:LANGFUSE_OTLP_ENDPOINT}
+        tls:
+          insecure: true
+      prometheus:
+        endpoint: 0.0.0.0:8888
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
     service:
+      extensions: [health_check]
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch]
+          processors: [memory_limiter, k8sattributes, resource, batch]
           exporters: [otlp]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource]
+          exporters: [prometheus]

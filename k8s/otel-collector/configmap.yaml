@@ -8,54 +8,69 @@ data:
     receivers:
       otlp:
         protocols:
-          grpc: {}
-          http: {}
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
 
     processors:
       memory_limiter:
         check_interval: 1s
         limit_mib: 1024
         spike_limit_mib: 200
+
       k8sattributes:
         auth_type: serviceAccount
         passthrough: false
+
       resource:
         attributes:
           - key: cloud.provider
             action: upsert
-            value: ${CLOUD_PROVIDER:aws}
+            value: aws
+
           - key: cloud.platform
             action: upsert
-            value: ${CLOUD_PLATFORM:eks}
+            value: eks
+
           - key: deployment.environment
             action: upsert
-            value: ${DEPLOYMENT_ENV:production}
+            value: production
+
       batch:
         timeout: 10s
         send_batch_size: 512
         send_batch_max_size: 512
-      queued_retry:
-        retry_on_failure:
-          enabled: true
-          initial_interval: 500ms
-          max_interval: 5s
-          max_elapsed_time: 300s
 
     exporters:
       otlp:
-        endpoint: ${LANGFUSE_OTLP_ENDPOINT:langfuse:4317}
+        endpoint: ${env:LANGFUSE_OTLP_ENDPOINT}
         tls:
           insecure: true
 
+      prometheus:
+        endpoint: 0.0.0.0:8888
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+      pprof:
+        endpoint: 0.0.0.0:1777
+
+      zpages:
+        endpoint: 0.0.0.0:55679
+
     service:
+      extensions: [health_check, pprof, zpages]
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource, queued_retry, batch]
+          processors: [memory_limiter, k8sattributes, resource, batch]
           exporters: [otlp]
 
-    telemetry:
-      metrics:
-        address: ":8888"
-      logs:
-        level: "info"
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource]
+          exporters: [prometheus]
+

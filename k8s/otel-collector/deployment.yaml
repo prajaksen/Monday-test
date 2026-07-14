@@ -25,6 +25,7 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: otel-collector-sa
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -43,7 +44,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: otel-collector
-          image: otel/opentelemetry-collector:latest
+          image: otel/opentelemetry-collector-contrib:0.156.0
           imagePullPolicy: IfNotPresent
           args: ["--config=/conf/collector-config.yaml"]
           ports:
@@ -53,20 +54,29 @@ spec:
               name: otlp-http
             - containerPort: 8888
               name: metrics
+            - containerPort: 13133
+              name: health
+            - containerPort: 1777
+              name: pprof
+            - containerPort: 55679
+              name: zpages
           readinessProbe:
             httpGet:
-              path: /metrics
-              port: 8888
-            initialDelaySeconds: 5
+              path: /
+              port: health
+            initialDelaySeconds: 15
             timeoutSeconds: 2
             periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
           livenessProbe:
             httpGet:
-              path: /metrics
-              port: 8888
-            initialDelaySeconds: 10
+              path: /
+              port: health
+            initialDelaySeconds: 30
             timeoutSeconds: 2
             periodSeconds: 20
+            failureThreshold: 3
           resources:
             requests:
               cpu: "250m"
@@ -74,6 +84,15 @@ spec:
             limits:
               cpu: "1000m"
               memory: "2Gi"
+          env:
+            - name: LANGFUSE_OTLP_ENDPOINT
+              value: "langfuse:4317"
+            - name: CLOUD_PROVIDER
+              value: "aws"
+            - name: CLOUD_PLATFORM
+              value: "eks"
+            - name: DEPLOYMENT_ENV
+              value: "production"
           volumeMounts:
             - name: config
               mountPath: /conf
