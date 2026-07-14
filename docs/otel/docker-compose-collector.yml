@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    volumes:
+      - ./collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    environment:
+      - "CLOUD_PROVIDER=aws"
+      - "CLOUD_PLATFORM=eks"
+      - "DEPLOYMENT_ENV=local"
+    command: ["--config", "/etc/otel-collector-config.yaml"]

@@ -1,0 +1,27 @@
+groups:
+  - name: otel-collector.rules
+    rules:
+      - alert: OTelCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenTelemetry Collector down"
+          description: "No targets for otel-collector are up for 2 minutes."
+
+      - alert: OTelCollectorHighMemory
+        expr: process_resident_memory_bytes{job="otel-collector"} > 2e+09
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on OTEL Collector"
+
+      - alert: OTelExporterFailures
+        expr: rate(otel_collector_exporter_failed_spans_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OTLP exporter failures detected"

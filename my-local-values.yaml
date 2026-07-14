@@ -1,0 +1,74 @@
+USER-SUPPLIED VALUES: null
+clickhouse:
+  auth:
+    password: 8fd5d1f3ca022907391cc9acb4ad9f66
+  deploy: true
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  resourcesPreset: none
+  shards: 1
+  zookeeper:
+    replicaCount: 1
+langfuse:
+  encryptionKey:
+    value: 97f6986bed18fd62542e025af2164bafe3d2e999505979dbc83e0eb7673cde1a
+  nextauth:
+    secret:
+      value: 2c5b85098614f18be1253cd1fea5baaae0e94c47a8f09cfa605a445407a07423
+  salt:
+    value: 4b78035194087c19dc208fd2890e921c97d3bf89595d3e47707cfc3a135bd085
+  web:
+    pod:
+      additionalEnv:
+      - name: NODE_OPTIONS
+        value: --max-old-space-size=1536
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
+  worker:
+    pod:
+      additionalEnv:
+      - name: NODE_OPTIONS
+        value: --max-old-space-size=1536
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
+postgresql:
+  auth:
+    password: 82d63714f0b16ad6b1277c3cda6aef2e
+  primary:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+redis:
+  auth:
+    password: 07299eac192ac44492bcd8cb72698d51
+  master:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+s3:
+  auth:
+    rootPassword: 50809a01a56ba72108ec17d62d7ee9ce

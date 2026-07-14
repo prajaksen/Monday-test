@@ -1,0 +1,56 @@
+receivers:
+  otlp:
+    protocols:
+      grpc: {}
+      http: {}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1024
+    spike_limit_mib: 200
+  k8sattributes:
+    auth_type: serviceAccount
+    passthrough: false
+  resource:
+    attributes:
+      - key: cloud.provider
+        action: upsert
+        value: ${CLOUD_PROVIDER:aws}
+      - key: cloud.platform
+        action: upsert
+        value: ${CLOUD_PLATFORM:eks}
+      - key: deployment.environment
+        action: upsert
+        value: ${DEPLOYMENT_ENV:production}
+  batch:
+    timeout: 10s
+    send_batch_size: 512
+    send_batch_max_size: 512
+  queued_retry:
+    # queued_retry keeps data on disk/memory when exporter is failing
+    retry_on_failure:
+      enabled: true
+      initial_interval: 500ms
+      max_interval: 5s
+      max_elapsed_time: 300s
+
+exporters:
+  otlp:
+    endpoint: ${LANGFUSE_OTLP_ENDPOINT:langfuse:4317}
+    tls:
+      insecure: true
+    # headers can be provided via environment variables in Deployment
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, resource, queued_retry, batch]
+      exporters: [otlp]
+
+telemetry:
+  metrics:
+    address: ":8888"
+  logs:
+    level: "info"

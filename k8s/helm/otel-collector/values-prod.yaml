@@ -1,0 +1,48 @@
+replicaCount: 3
+image:
+  repository: otel/opentelemetry-collector
+  tag: "v0.76.0"
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "REPLACE_WITH_IRSA_ROLE_ARN"
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+collector:
+  configFile: |-
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 4096
+        spike_limit_mib: 512
+      k8sattributes: {}
+      resource: {}
+      queued_retry: {}
+      batch:
+        timeout: 10s
+        send_batch_size: 512
+    exporters:
+      otlp:
+        endpoint: "${LANGFUSE_OTLP_ENDPOINT:langfuse:4317}"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resource, queued_retry, batch]
+          exporters: [otlp]

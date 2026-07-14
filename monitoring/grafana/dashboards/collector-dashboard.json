@@ -1,0 +1,28 @@
+{
+  "id": null,
+  "uid": "otel-collector",
+  "title": "OTel Collector Overview",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Traces Received (1m)",
+      "targets": [
+        {
+          "expr": "sum(rate(otel_collector_received_spans_total[1m]))",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 3}
+    },
+    {
+      "type": "graph",
+      "title": "Exporter Failures",
+      "targets": [
+        {"expr": "rate(otel_collector_exporter_failed_spans_total[5m])", "refId": "A"}
+      ],
+      "gridPos": {"x": 6, "y": 0, "w": 12, "h": 6}
+    }
+  ],
+  "schemaVersion": 27,
+  "version": 1
+}

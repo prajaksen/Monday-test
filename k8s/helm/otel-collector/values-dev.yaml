@@ -1,0 +1,35 @@
+replicaCount: 1
+image:
+  repository: otel/opentelemetry-collector
+  tag: latest
+serviceAccount:
+  create: true
+  annotations: {}
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+autoscaling:
+  enabled: false
+collector:
+  configFile: |-
+    # use the local development collector config
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+    processors:
+      batch: {}
+    exporters:
+      otlp:
+        endpoint: "langfuse:4317"
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp]

@@ -10,15 +10,15 @@ from flask import Flask, jsonify, request
 
 load_dotenv()
 
-from telemetry import init_telemetry, traced_span
+from telemetry import init_telemetry, traced_span, run_subprocess_traced, set_tenant_context
 
 app = Flask(__name__)
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
-# Initialize OpenTelemetry (OTLP -> Langfuse)
-init_telemetry(service_name=os.getenv("OTEL_SERVICE_NAME", "langfuse-poc"))
+# Initialize OpenTelemetry (OTLP -> Collector -> Langfuse)
+init_telemetry(service_name=os.getenv("OTEL_SERVICE_NAME", "langfuse-poc"), app=app)
 
 
 def get_postgres_password() -> str:
@@ -27,7 +27,7 @@ def get_postgres_password() -> str:
         return os.environ.get("POSTGRES_PASSWORD", "")
 
     try:
-        result = subprocess.run(
+        result = run_subprocess_traced(
             [
                 "kubectl",
                 "get",
@@ -268,7 +268,13 @@ def monday_webhook():
     )
 
     script_path = os.path.join(os.path.dirname(__file__), "scripts", "update-langfuse.sh")
-    result = subprocess.run(["bash", script_path], capture_output=True, text=True, env=env)
+    # propagate tenant context into the current trace and baggage
+    try:
+        set_tenant_context(context)
+    except Exception:
+        pass
+
+    result = run_subprocess_traced(["bash", script_path], capture_output=True, text=True, env=env)
 
     print(result.stdout)
     if result.stderr:
