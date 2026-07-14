@@ -1,9 +1,9 @@
 OTel Collector Kubernetes manifests
 
-Apply the manifests into the `observability` namespace:
+Apply the manifests into the `llm-monitoring` namespace:
 
 ```bash
-kubectl create ns observability || true
+kubectl create ns llm-monitoring || true
 kubectl apply -f k8s/otel-collector/serviceaccount.yaml
 kubectl apply -f k8s/otel-collector/configmap.yaml
 kubectl apply -f k8s/otel-collector/deployment.yaml

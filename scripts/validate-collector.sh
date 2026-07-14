@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NS=observability
+NS=llm-monitoring
 
 echo "Checking namespace $NS"
 kubectl get ns $NS >/dev/null 2>&1 || { echo "Namespace $NS not found"; exit 2; }

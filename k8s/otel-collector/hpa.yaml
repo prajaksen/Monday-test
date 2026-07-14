@@ -2,7 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: otel-collector-hpa
-  namespace: observability
+  namespace: llm-monitoring
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
